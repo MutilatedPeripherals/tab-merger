@@ -15,7 +15,6 @@ def merge_gp5_files(input_files, output_file):
     try:
         merged_song = guitarpro.parse(input_files[0])
         merged_song.title = "Setlist - " + merged_song.title
-        
         merged_song.version = "FICHIER GUITAR PRO v5.00"
     except Exception as e:
         raise Exception(f"Error loading first file {input_files[0]}: {str(e)}")
@@ -24,23 +23,37 @@ def merge_gp5_files(input_files, output_file):
         try:
             current_song = guitarpro.parse(file_path)
             
+            # Ensure track alignment: If a song has no tracks, add an empty one
+            if not current_song.tracks:
+                empty_track = guitarpro.models.Track(merged_song, 1)
+                current_song.tracks.append(empty_track)
+            
+            # Insert a double bar line before adding new measures
             if len(merged_song.tracks[0].measures) > 0:
                 last_measure = merged_song.tracks[0].measures[-1]
                 last_measure.header.isDoubleBar = True
             
+            # Ensure tempo changes are added correctly
+            for measure in current_song.tracks[0].measures:
+                if measure.header.tempo:
+                    tempo = guitarpro.models.Tempo(value=measure.header.tempo.value)
+                    measure.header.tempo = tempo
+                    
+            # Merge tracks properly
             for track_idx, track in enumerate(current_song.tracks):
                 if track_idx < len(merged_song.tracks):
                     merged_song.tracks[track_idx].measures.extend(track.measures)
                 else:
                     merged_song.tracks.append(track)
-                    
+            
+            # Add a text marker to indicate song separation
             first_new_measure = len(merged_song.tracks[0].measures) - len(current_song.tracks[0].measures)
             if first_new_measure >= 0:
                 measure = merged_song.tracks[0].measures[first_new_measure]
                 text = guitarpro.models.Text()
                 text.value = f"--- {current_song.title} ---"
                 measure.text = text
-                
+            
         except Exception as e:
             print(f"Warning: Error processing {file_path}: {str(e)}")
             continue
